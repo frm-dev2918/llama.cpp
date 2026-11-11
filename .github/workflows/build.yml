@@ -1,0 +1,54 @@
+name: Build llama.cpp with Vulkan + OpenBLAS + AVX2
+
+on:
+  workflow_dispatch: # امکان اجرای دستی از تب Actions
+  push:
+    tags:
+      - 'v*' # اجرا هنگام پوش تگ نسخه جدید
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (Vulkan, OpenBLAS, build tools)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake git \
+            libvulkan-dev glslc vulkan-tools \
+            libopenblas-dev liblapack-dev pkg-config
+
+      - name: Verify Vulkan availability (optional)
+        run: vulkaninfo --summary || echo "Vulkan not available on runner, but compiling anyway."
+
+      - name: Configure CMake with Vulkan, OpenBLAS, and AVX2 optimizations
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DGGML_VULKAN=ON \
+            -DGGML_BLAS=ON \
+            -DGGML_BLAS_VENDOR=OpenBLAS \
+            -DGGML_NATIVE=OFF \
+            -DGGML_AVX2=ON \
+            -DGGML_F16C=ON \
+            -DGGML_FMA=ON \
+            -DLLAMA_CURL=OFF \
+            -DLLAMA_OPENSSL=OFF
+
+      - name: Build
+        run: cmake --build build --config Release -j $(nproc)
+
+      - name: Package artifacts
+        run: |
+          mkdir -p artifacts
+          cp -r build/bin/* artifacts/
+          cd artifacts && zip -r ../llama-vulkan-openblas-avx2.zip ./*
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: llama-vulkan-openblas-avx2
+          path: llama-vulkan-openblas-avx2.zip
