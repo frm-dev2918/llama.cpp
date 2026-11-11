@@ -17,11 +17,11 @@ jobs:
 
       - name: Install dependencies (Vulkan, OpenBLAS, build tools)
         run: |
-          # آپدیت کامل مخازن برای جلوگیری از خطای exit code 100
+          # آپدیت کامل مخازن
           sudo apt-get update -y
           sudo apt-get upgrade -y
           
-          # نصب پیش‌نیازهای کامپایل، Vulkan و OpenBLAS
+          # نصب پیش‌نیازهای کامپایل، Vulkan (شامل SPIRV-Headers) و OpenBLAS
           sudo apt-get install -y \
             build-essential \
             cmake \
@@ -29,6 +29,8 @@ jobs:
             libvulkan-dev \
             vulkan-tools \
             glslc \
+            glslang-tools \
+            spirv-headers \
             libopenblas-dev \
             liblapack-dev \
             pkg-config
