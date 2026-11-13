@@ -1,0 +1,48 @@
+name: Build llama-finetune-lora
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository (for workflow file)
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake git libcurl4-openssl-dev
+
+      - name: Clone llama.cpp and fetch the LoRA PR
+        run: |
+          git clone --depth 1 https://github.com/ggml-org/llama.cpp.git
+          cd llama.cpp
+          git fetch origin pull/31258/head:lora-cpu
+          git checkout lora-cpu
+
+      - name: Configure CMake
+        run: |
+          cd llama.cpp
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF
+
+      - name: Build llama-finetune-lora
+        run: |
+          cd llama.cpp
+          cmake --build build --config Release --target llama-finetune-lora -j$(nproc)
+
+      - name: Prepare artifact (binary + shared libraries)
+        run: |
+          mkdir -p artifact
+          cp llama.cpp/build/bin/llama-finetune-lora artifact/
+          cp llama.cpp/build/bin/*.so* artifact/ 2>/dev/null || true
+          ls -lh artifact/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: llama-finetune-lora-linux-x64
+          path: artifact/
+          if-no-files-found: error
