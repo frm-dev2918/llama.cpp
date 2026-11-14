@@ -1,18 +1,13 @@
 name: Build llama.cpp for ARMv7
 
 on:
-  workflow_dispatch: # امکان اجرای دستی از تب Actions
+  workflow_dispatch:
   push:
-    branches: [ main, master ] # با هر پوش به شاخه اصلی اجرا می‌شود
-    paths:
-      - '.github/workflows/build-armv7.yml'
-      - 'CMakeLists.txt'
-      - 'ggml/**'
-      - 'src/**'
+    branches: [ main, master ]
 
 jobs:
   build-armv7:
-    runs-on: ubuntu-22.04 # استفاده از اوبونتو پایدار برای Cross-Compile
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Checkout Repository
@@ -28,6 +23,14 @@ jobs:
           ninja-build \
           git
 
+    # این مرحله جدید است تا باگ FP16 را دور بزند
+    - name: Disable llamafile for ARMv7
+      run: |
+        # حذف ماژول llamafile از فایل CMake اصلی
+        sed -i '/ggml-cpu\/llamafile\/sgemm.cpp/d' ggml/src/CMakeLists.txt
+        # اطمینان از اینکه فلگ های مربوطه خاموش هستند
+        sed -i 's/ggml_add_cpu_backend_variant(.* llamafile.*/ggml_add_cpu_backend_variant(FALSE)/g' ggml/src/CMakeLists.txt || true
+
     - name: Configure CMake for ARMv7
       run: |
         cmake -B build \
@@ -39,9 +42,10 @@ jobs:
           -DCMAKE_SYSTEM_PROCESSOR=arm \
           -DGGML_NATIVE=OFF \
           -DGGML_CPU_ARM_ARCH="armv7-a+neon" \
-          -DGGML_USE_LLAMAFILE=OFF \
-          -DLLAMA_PORTABLE=1 \
-          -DGGML_OPENMP=OFF
+          -DGGML_OPENMP=OFF \
+          -DGGML_CCACHE=OFF \
+          -DLLAMA_BUILD_TESTS=OFF \
+          -DLLAMA_BUILD_EXAMPLES=OFF
 
     - name: Build llama.cpp
       run: |
@@ -50,13 +54,10 @@ jobs:
     - name: Package Artifacts
       run: |
         mkdir -p artifact/bin
-        # کپی کردن فایل‌های اجرایی اصلی
         cp build/bin/llama-cli artifact/bin/ 2>/dev/null || true
         cp build/bin/llama-server artifact/bin/ 2>/dev/null || true
         cp build/bin/llama-bench artifact/bin/ 2>/dev/null || true
-        # کپی کردن کتابخانه‌های اشتراکی در صورت وجود
         cp build/bin/*.so artifact/bin/ 2>/dev/null || true
-        # ساخت فایل زیپ
         cd artifact && zip -r ../llama-armv7-build.zip .
 
     - name: Upload Artifact
